@@ -1,5 +1,5 @@
 // components/CountdownApp.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Menu, X, Clock } from 'lucide-react';
 import { useCountdown } from '../hooks/useCountdown';
 import { TankVisualization } from './TankVisualization';
@@ -41,6 +41,7 @@ export default function CountdownApp() {
   const [clockStyle, setClockStyle] = useState<'simple' | 'full' | 'combined'>('simple');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
+  const [isFlashing, setIsFlashing] = useState(false);
   const [alarmSettings, setAlarmSettings] = useState<AlarmSettings>({
     vibration: true,
     vibrationDuration: 1000,
@@ -60,6 +61,18 @@ export default function CountdownApp() {
   } = useCountdown();
 
   const lastTimerSettings = React.useRef({ minutes: 0, seconds: 0 });
+
+  // Prevent scroll when menu is open
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, [isMenuOpen]);
 
   useEffect(() => {
     let wakeLock: WakeLockSentinel | null = null;
@@ -91,7 +104,15 @@ export default function CountdownApp() {
         navigator.vibrate([alarmSettings.vibrationDuration]);
       }
       if (alarmSettings.flash) {
-        // Obsługa lampy błyskowej
+        setIsFlashing(true);
+        const flashInterval = setInterval(() => {
+          setIsFlashing(prev => !prev);
+        }, 1000);
+        
+        setTimeout(() => {
+          clearInterval(flashInterval);
+          setIsFlashing(false);
+        }, alarmSettings.flashDuration);
       }
       if (alarmSettings.sound && alarmSettings.soundFile) {
         const audio = new Audio(alarmSettings.soundFile);
@@ -102,9 +123,7 @@ export default function CountdownApp() {
 
   const getTotalMinutes = () => Math.ceil(totalTime / 60);
   const getTotalSeconds = () => totalTime;
-  const getElapsedFullMinutes = () => Math.floor((totalTime - timeLeft) / 60);
-  const getElapsedSeconds = () => totalTime - timeLeft;
-
+  
   const formatTimeSimple = () => {
     const minutes = Math.floor(timeLeft / 60).toString().padStart(2, '0');
     const seconds = (timeLeft % 60).toString().padStart(2, '0');
@@ -130,7 +149,7 @@ export default function CountdownApp() {
   };
 
   const handleStart = (e: React.MouseEvent) => {
-    e.stopPropagation();
+    e.preventDefault();
     const mins = parseInt(inputMinutes) || 0;
     const secs = parseInt(inputSeconds) || 0;
     const totalSeconds = (mins * 60) + secs;
@@ -146,7 +165,7 @@ export default function CountdownApp() {
   };
 
   const handleStartToTime = (e: React.MouseEvent) => {
-    e.stopPropagation();
+    e.preventDefault();
     if (targetTime) {
       const [hours, minutes] = targetTime.split(':');
       const target = new Date();
@@ -166,17 +185,18 @@ export default function CountdownApp() {
   };
 
   const handleRepeatLastTimer = (e: React.MouseEvent) => {
-    e.stopPropagation();
+    e.preventDefault();
     const { minutes, seconds } = lastTimerSettings.current;
     const totalSeconds = (minutes * 60) + seconds;
     if (totalSeconds > 0) {
       setTotalTime(totalSeconds);
       startTimer(totalSeconds);
+      setIsMenuOpen(false);
     }
   };
 
   const handleReset = (e: React.MouseEvent) => {
-    e.stopPropagation();
+    e.preventDefault();
     resetTimer();
     setTotalTime(0);
     setInputMinutes('');
@@ -187,7 +207,7 @@ export default function CountdownApp() {
   };
 
   const handleSoundFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    event.stopPropagation();
+    event.preventDefault();
     const file = event.target.files?.[0];
     if (file) {
       const url = URL.createObjectURL(file);
@@ -203,11 +223,22 @@ export default function CountdownApp() {
     }
   };
 
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const value = e.target.value;
+    if (value === '' || (parseInt(value) >= 0 && parseInt(value) <= 500)) {
+      updateSegments(value);
+      setScaleType('custom');
+    }
+  }, []);
+
   const GridVisualization = () => {
     const totalSegments = getSegmentCount();
     const cols = totalSegments <= 10 ? totalSegments : 
                 totalSegments <= 20 ? 10 : 
                 Math.min(Math.ceil(Math.sqrt(totalSegments)), 12);
+    
+    const activeSegments = Math.ceil((1 - progress) * totalSegments);
     
     return (
       <div 
@@ -215,15 +246,15 @@ export default function CountdownApp() {
           display: 'grid',
           gridTemplateColumns: `repeat(${cols}, 1fr)`,
           gap: '2px',
-          height: '60vh',
+          height: '50vh',
         }} 
         className="w-full mb-4"
       >
-        {[...Array(totalSegments)].map((_, index) => (
+        {[...Array(totalSegments)].map((unused, index) => (
           <div
             key={index}
             className={`w-full ${
-              index < Math.floor((1 - progress) * totalSegments) ? 'bg-green-500' : 'bg-gray-800'
+              index < activeSegments ? 'bg-green-500' : 'bg-gray-800'
             }`}
           />
         ))}
@@ -233,307 +264,291 @@ export default function CountdownApp() {
 
   const LineVisualization = () => {
     const totalSegments = getSegmentCount();
+    const activeSegments = Math.ceil((1 - progress) * totalSegments);
     
     return (
-      <div className="mb-4 space-y-2 w-full h-[60vh] flex flex-col justify-end">
+      <div className="mb-4 space-y-2 w-full h-[50vh] flex flex-col justify-end">
         <div className="h-6 bg-gray-800 relative flex w-full">
           {[...Array(totalSegments)].map((_, index) => (
             <div
               key={index}
               className={`flex-1 border-r border-black ${
-                index < Math.floor((1 - progress) * totalSegments) ? 'bg-green-500' : 'bg-gray-800'
+                index < activeSegments ? 'bg-green-500' : 'bg-gray-800'
               }`}
             />
           ))}
         </div>
         <div className="text-gray-400 text-center text-sm">
-          {Math.round(progress * 100)}%
+          {Math.round((1 - progress) * 100)}%
         </div>
       </div>
     );
   };
-const SideMenu = () => (
-    <div 
-      className={`fixed top-0 right-0 h-full w-72 bg-gray-900 transform transition-transform duration-300 z-50 ${
-        isMenuOpen ? 'translate-x-0' : 'translate-x-full'
-      }`}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="p-6 overflow-y-auto h-full">
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsMenuOpen(false);
-          }}
-          className="absolute top-6 right-6 text-gray-400 p-2 touch-manipulation"
-        >
-          <X size={24} />
-        </button>
-        
-        <div className="space-y-6 mt-16">
-          {/* Sekcja Wygląd */}
-          <div>
-            <h3 className="text-gray-400 font-medium mb-4">Wygląd</h3>
+
+  const SideMenu = () => {
+    const menuRef = React.useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+      const handleClickOutside = (event: MouseEvent) => {
+        if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+          setIsMenuOpen(false);
+        }
+      };
+
+      if (isMenuOpen) {
+        document.addEventListener('mousedown', handleClickOutside);
+      }
+
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }, [isMenuOpen]);
+
+    return (
+      <div 
+        ref={menuRef}
+        className={`fixed top-0 right-0 h-full w-72 bg-gray-900 transform transition-transform duration-300 z-50 ${
+          isMenuOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="h-full overflow-y-auto">
+          <div className="p-6 pb-24">
+            <button 
+              onClick={() => setIsMenuOpen(false)}
+              className="absolute top-6 right-6 text-gray-400 p-2"
+            >
+              <X size={24} />
+            </button>
             
-            <div className="space-y-4">
+            <div className="space-y-6 mt-16">
+              {/* Sekcja Wygląd */}
               <div>
-                <p className="text-gray-400 mb-2">Styl zegara:</p>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setClockStyle('simple');
-                  }}
-                  className={`block w-full text-left p-3 rounded ${
-                    clockStyle === 'simple' ? 'bg-gray-700' : 'text-gray-400'
-                  }`}
-                >
-                  Prosty (mm:ss)
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setClockStyle('full');
-                  }}
-                  className={`block w-full text-left p-3 rounded mt-2 ${
-                    clockStyle === 'full' ? 'bg-gray-700' : 'text-gray-400'
-                  }`}
-                >
-                  Pełny (hh:mm:ss)
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setClockStyle('combined');
-                  }}
-                  className={`block w-full text-left p-3 rounded mt-2 ${
-                    clockStyle === 'combined' ? 'bg-gray-700' : 'text-gray-400'
-                  }`}
-                >
-                  Połączony
-                </button>
-              </div>
+                <h3 className="text-gray-400 font-medium mb-4">Wygląd</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-gray-400 mb-2">Styl zegara:</p>
+                    <button
+                      onClick={() => setClockStyle('simple')}
+                      className={`block w-full text-left p-3 rounded ${
+                        clockStyle === 'simple' ? 'bg-gray-700' : 'text-gray-400'
+                      }`}
+                    >
+                      Prosty (mm:ss)
+                    </button>
+                    <button
+                      onClick={() => setClockStyle('full')}
+                      className={`block w-full text-left p-3 rounded mt-2 ${
+                        clockStyle === 'full' ? 'bg-gray-700' : 'text-gray-400'
+                      }`}
+                    >
+                      Pełny (hh:mm:ss)
+                    </button>
+                    <button
+                      onClick={() => setClockStyle('combined')}
+                      className={`block w-full text-left p-3 rounded mt-2 ${
+                        clockStyle === 'combined' ? 'bg-gray-700' : 'text-gray-400'
+                      }`}
+                    >
+                      Połączony
+                    </button>
+                  </div>
 
-              <div>
-                <p className="text-gray-400 mb-2">Wizualizacja:</p>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setVisualizationType('grid');
-                  }}
-                  className={`block w-full text-left p-3 rounded ${
-                    visualizationType === 'grid' ? 'bg-gray-700' : 'text-gray-400'
-                  }`}
-                >
-                  Siatka
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setVisualizationType('line');
-                  }}
-                  className={`block w-full text-left p-3 rounded mt-2 ${
-                    visualizationType === 'line' ? 'bg-gray-700' : 'text-gray-400'
-                  }`}
-                >
-                  Oś czasu
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setVisualizationType('tank');
-                  }}
-                  className={`block w-full text-left p-3 rounded mt-2 ${
-                    visualizationType === 'tank' ? 'bg-gray-700' : 'text-gray-400'
-                  }`}
-                >
-                  Zbiornik
-                </button>
-              </div>
+                  <div>
+                    <p className="text-gray-400 mb-2">Wizualizacja:</p>
+                    <button
+                      onClick={() => setVisualizationType('grid')}
+                      className={`block w-full text-left p-3 rounded ${
+                        visualizationType === 'grid' ? 'bg-gray-700' : 'text-gray-400'
+                      }`}
+                    >
+                      Siatka
+                    </button>
+                    <button
+                      onClick={() => setVisualizationType('line')}
+                      className={`block w-full text-left p-3 rounded mt-2 ${
+                        visualizationType === 'line' ? 'bg-gray-700' : 'text-gray-400'
+                      }`}
+                    >
+                      Oś czasu
+                    </button>
+                    <button
+                      onClick={() => setVisualizationType('tank')}
+                      className={`block w-full text-left p-3 rounded mt-2 ${
+                        visualizationType === 'tank' ? 'bg-gray-700' : 'text-gray-400'
+                      }`}
+                    >
+                      Zbiornik
+                    </button>
+                  </div>
 
-              <div>
-                <p className="text-gray-400 mb-2">Podziałka:</p>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setScaleType('minutes');
-                  }}
-                  className={`block w-full text-left p-3 rounded ${
-                    scaleType === 'minutes' ? 'bg-gray-700' : 'text-gray-400'
-                  }`}
-                >
-                  Jeden segment = minuta
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setScaleType('seconds');
-                  }}
-                  className={`block w-full text-left p-3 rounded mt-2 ${
-                    scaleType === 'seconds' ? 'bg-gray-700' : 'text-gray-400'
-                  }`}
-                >
-                  Jeden segment = sekunda
-                </button>
-                {SEGMENT_OPTIONS.map(option => (
-                  <button
-                    key={option}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setScaleType('custom');
-                      setSegmentCount(option);
-                    }}
-                    className={`block w-full text-left p-3 rounded mt-2 ${
-                      scaleType === 'custom' && segmentCount === option ? 'bg-gray-700' : 'text-gray-400'
-                    }`}
-                  >
-                    {option} segmentów
-                  </button>
-                ))}
-                <div className="mt-2 relative">
-                  <input
-                    type="number"
-                    placeholder="Własna wartość"
-                    className="w-full p-3 rounded bg-gray-800 text-white"
-                    value={customSegments}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      updateSegments(e.target.value);
-                      setScaleType('custom');
-                    }}
-                    onFocus={(e) => e.stopPropagation()}
-                    min="1"
-                    max="500"
-                  />
+                  <div>
+                    <p className="text-gray-400 mb-2">Podziałka:</p>
+                    <button
+                      onClick={() => setScaleType('minutes')}
+                      className={`block w-full text-left p-3 rounded ${
+                        scaleType === 'minutes' ? 'bg-gray-700' : 'text-gray-400'
+                      }`}
+                    >
+                      Jeden segment = minuta
+                    </button>
+                    <button
+                      onClick={() => setScaleType('seconds')}
+                      className={`block w-full text-left p-3 rounded mt-2 ${
+                        scaleType === 'seconds' ? 'bg-gray-700' : 'text-gray-400'
+                      }`}
+                    >
+                      Jeden segment = sekunda
+                    </button>
+                    {SEGMENT_OPTIONS.map(option => (
+                      <button
+                        key={option}
+                        onClick={() => {
+                          setScaleType('custom');
+                          setSegmentCount(option);
+                        }}
+                        className={`block w-full text-left p-3 rounded mt-2 ${
+                          scaleType === 'custom' && segmentCount === option ? 'bg-gray-700' : 'text-gray-400'
+                        }`}
+                      >
+                        {option} segmentów
+                      </button>
+                    ))}
+                    <div className="mt-2 relative">
+                      <input
+                        type="number"
+                        placeholder="Własna wartość"
+                        className="w-full p-3 rounded bg-gray-800 text-white"
+                        value={customSegments}
+                        onChange={handleInputChange}
+                        min="1"
+                        max="500"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              {/* Sekcja Alarmy */}
+              <div className="border-t border-gray-700 pt-6">
+                <h3 className="text-gray-400 font-medium mb-4">Alarmy</h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={alarmSettings.vibration}
+                        onChange={(e) => {
+                          setAlarmSettings(prev => ({
+                            ...prev,
+                            vibration: e.target.checked
+                          }));
+                        }}
+                        className="rounded bg-gray-800"
+                      />
+                      <span className="text-gray-400">Wibracje</span>
+                    </label>
+                    {alarmSettings.vibration && (
+                      <input
+                        type="number"
+                        placeholder="Czas wibracji (ms)"
+                        className="mt-2 w-full p-3 rounded bg-gray-800 text-white"
+                        value={alarmSettings.vibrationDuration}
+                        onChange={(e) => {
+                          setAlarmSettings(prev => ({
+                            ...prev,
+                            vibrationDuration: parseInt(e.target.value) || 1000
+                          }));
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={alarmSettings.sound}
+                        onChange={(e) => {
+                          setAlarmSettings(prev => ({
+                            ...prev,
+                            sound: e.target.checked
+                          }));
+                        }}
+                        className="rounded bg-gray-800"
+                      />
+                      <span className="text-gray-400">Dźwięk</span>
+                    </label>
+                    {alarmSettings.sound && (
+                      <input
+                        type="file"
+                        accept="audio/*"
+                        onChange={handleSoundFileChange}
+                        className="mt-2 w-full p-3 rounded bg-gray-800 text-white"
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        checked={alarmSettings.flash}
+                        onChange={(e) => {
+                          setAlarmSettings(prev => ({
+                            ...prev,
+                            flash: e.target.checked
+                          }));
+                        }}
+                        className="rounded bg-gray-800"
+                      />
+                      <span className="text-gray-400">Lampa błyskowa</span>
+                    </label>
+                    {alarmSettings.flash && (
+                      <input
+                        type="number"
+                        placeholder="Czas błysku (ms)"
+                        className="mt-2 w-full p-3 rounded bg-gray-800 text-white"
+                        value={alarmSettings.flashDuration}
+                        onChange={(e) => {
+                          setAlarmSettings(prev => ({
+                            ...prev,
+                            flashDuration: parseInt(e.target.value) || 3000
+                          }));
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sekcja Akcje */}
+              <div className="border-t border-gray-700 pt-6">
+                <button
+                  onClick={handleRepeatLastTimer}
+                  className="w-full p-4 bg-gray-800 text-gray-400 rounded mb-2"
+                >
+                  Powtórz ostatni timer
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="w-full p-4 bg-gray-800 text-gray-400 rounded"
+                >
+                  Reset
+                </button>
+              </div>
             </div>
-          </div>
-
-          {/* Sekcja Alarmy */}
-          <div className="border-t border-gray-700 pt-6">
-            <h3 className="text-gray-400 font-medium mb-4">Alarmy</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={alarmSettings.vibration}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      setAlarmSettings(prev => ({
-                        ...prev,
-                        vibration: e.target.checked
-                      }));
-                    }}
-                    className="rounded bg-gray-800"
-                  />
-                  <span className="text-gray-400">Wibracje</span>
-                </label>
-                {alarmSettings.vibration && (
-                  <input
-                    type="number"
-                    placeholder="Czas wibracji (ms)"
-                    className="mt-2 w-full p-3 rounded bg-gray-800 text-white"
-                    value={alarmSettings.vibrationDuration}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      setAlarmSettings(prev => ({
-                        ...prev,
-                        vibrationDuration: parseInt(e.target.value) || 1000
-                      }));
-                    }}
-                    onFocus={(e) => e.stopPropagation()}
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={alarmSettings.sound}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      setAlarmSettings(prev => ({
-                        ...prev,
-                        sound: e.target.checked
-                      }));
-                    }}
-                    className="rounded bg-gray-800"
-                  />
-                  <span className="text-gray-400">Dźwięk</span>
-                </label>
-                {alarmSettings.sound && (
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    onChange={handleSoundFileChange}
-                    className="mt-2 w-full p-3 rounded bg-gray-800 text-white"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                )}
-              </div>
-
-              <div>
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={alarmSettings.flash}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      setAlarmSettings(prev => ({
-                        ...prev,
-                        flash: e.target.checked
-                      }));
-                    }}
-                    className="rounded bg-gray-800"
-                  />
-                  <span className="text-gray-400">Lampa błyskowa</span>
-                </label>
-                {alarmSettings.flash && (
-                  <input
-                    type="number"
-                    placeholder="Czas błysku (ms)"
-                    className="mt-2 w-full p-3 rounded bg-gray-800 text-white"
-                    value={alarmSettings.flashDuration}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      setAlarmSettings(prev => ({
-                        ...prev,
-                        flashDuration: parseInt(e.target.value) || 3000
-                      }));
-                    }}
-                    onFocus={(e) => e.stopPropagation()}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Sekcja Akcje */}
-          <div className="border-t border-gray-700 pt-6">
-            <button
-              onClick={handleRepeatLastTimer}
-              className="w-full p-4 bg-gray-800 text-gray-400 rounded mb-2 touch-manipulation"
-            >
-              Powtórz ostatni timer
-            </button>
-            <button
-              onClick={handleReset}
-              className="w-full p-4 bg-gray-800 text-gray-400 rounded touch-manipulation"
-            >
-              Reset
-            </button>
           </div>
         </div>
       </div>
-    </div>
-  );
-const TimeSelector = () => (
+    );
+  };
+
+  const TimeSelector = () => (
     <div 
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-      onClick={(e) => e.stopPropagation()}
     >
       <div className="bg-gray-900 rounded-lg p-6 w-full max-w-sm">
         <h3 className="text-white text-lg mb-4">Wybierz czas</h3>
@@ -542,8 +557,7 @@ const TimeSelector = () => (
           {PREDEFINED_TIMES.map(({ label, minutes }) => (
             <button
               key={label}
-              onClick={(e) => {
-                e.stopPropagation();
+              onClick={() => {
                 setInputMinutes(minutes.toString());
                 setInputSeconds('0');
                 setShowTimeSelector(false);
@@ -561,17 +575,12 @@ const TimeSelector = () => (
             className="flex-1 p-3 rounded bg-gray-800 text-white mr-2"
             value={`00:${inputMinutes.padStart(2, '0')}`}
             onChange={(e) => {
-              e.stopPropagation();
               const [_, minutes] = e.target.value.split(':');
               setInputMinutes(minutes);
             }}
-            onFocus={(e) => e.stopPropagation()}
           />
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowTimeSelector(false);
-            }}
+            onClick={() => setShowTimeSelector(false)}
             className="p-3 bg-gray-700 rounded text-white"
           >
             OK
@@ -582,21 +591,15 @@ const TimeSelector = () => (
   );
 
   const SetupScreen = () => (
-    <div 
-      className="min-h-screen bg-black p-6 flex flex-col"
-      onClick={(e) => e.stopPropagation()}
-    >
+    <div className="h-screen bg-black p-6 flex flex-col">
       <h1 className="text-white text-2xl mb-8 text-center">Ustaw Timer</h1>
       
       <div className="space-y-8">
         <div className="space-y-4">
           <p className="text-gray-400">Czas odliczania:</p>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowTimeSelector(true);
-            }}
-            className="w-full p-4 rounded bg-gray-800 text-white text-lg flex items-center justify-between touch-manipulation"
+            onClick={() => setShowTimeSelector(true)}
+            className="w-full p-4 rounded bg-gray-800 text-white text-lg flex items-center justify-between"
           >
             <span>{inputMinutes ? `${inputMinutes}:${inputSeconds.padStart(2, '0')}` : 'Wybierz czas'}</span>
             <Clock size={24} />
@@ -604,7 +607,7 @@ const TimeSelector = () => (
           {showTimeSelector && <TimeSelector />}
           <button
             onClick={handleStart}
-            className="w-full p-4 bg-red-600 rounded text-white text-lg touch-manipulation"
+            className="w-full p-4 bg-red-600 rounded text-white text-lg"
           >
             Start
           </button>
@@ -614,17 +617,13 @@ const TimeSelector = () => (
           <p className="text-gray-400">Godzina docelowa:</p>
           <input
             type="time"
-            className="w-full p-4 rounded bg-gray-800 text-white text-lg touch-manipulation"
+            className="w-full p-4 rounded bg-gray-800 text-white text-lg"
             value={targetTime}
-            onChange={(e) => {
-              e.stopPropagation();
-              setTargetTime(e.target.value);
-            }}
-            onFocus={(e) => e.stopPropagation()}
+            onChange={(e) => setTargetTime(e.target.value)}
           />
           <button
             onClick={handleStartToTime}
-            className="w-full p-4 bg-red-600 rounded text-white text-lg touch-manipulation"
+            className="w-full p-4 bg-red-600 rounded text-white text-lg"
           >
             Start
           </button>
@@ -634,13 +633,10 @@ const TimeSelector = () => (
   );
 
   const CountdownScreen = () => (
-    <div className="min-h-screen bg-black p-4 flex flex-col">
+    <div className={`h-screen bg-black p-4 flex flex-col ${isFlashing ? 'bg-white' : 'bg-black'}`}>
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsMenuOpen(true);
-        }}
-        className="absolute top-4 right-4 text-gray-600 p-2 touch-manipulation z-40"
+        onClick={() => setIsMenuOpen(true)}
+        className="absolute top-4 right-4 text-gray-600 p-2 z-40"
       >
         <Menu size={24} />
       </button>
@@ -679,7 +675,7 @@ const TimeSelector = () => (
   );
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="h-screen bg-black">
       {screen === 'setup' ? <SetupScreen /> : <CountdownScreen />}
     </div>
   );

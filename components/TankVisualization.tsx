@@ -7,25 +7,24 @@ interface TankVisualizationProps {
 }
 
 export const TankVisualization: React.FC<TankVisualizationProps> = ({ progress, segments }) => {
+  const activeSegments = Math.ceil((1 - progress) * segments);
+  
   return (
-    <div className="w-full h-[75vh] bg-green-500 relative overflow-hidden">
+    <div className="w-full h-[50vh] bg-gray-800 relative overflow-hidden">
+      <div className="absolute bottom-0 left-0 w-full bg-green-500" style={{
+        height: `${(activeSegments / segments) * 100}%`,
+        transition: 'height 0.2s ease-out'
+      }} />
       <div className="absolute top-0 left-0 w-full h-full flex flex-col">
-        {[...Array(segments)].map((_, index) => {
-          const segmentProgress = index / segments;
-          const isInactive = segmentProgress < progress;
-          
-          return (
-            <div
-              key={index}
-              className={`w-full flex-1 border-b border-black transition-colors duration-200 ${
-                isInactive ? 'bg-gray-800' : 'bg-green-500'
-              }`}
-              style={{
-                height: `${100/segments}%`
-              }}
-            />
-          );
-        })}
+        {[...Array(segments)].map((_, index) => (
+          <div
+            key={index}
+            className="w-full flex-1 border-b border-black"
+            style={{
+              height: `${100/segments}%`
+            }}
+          />
+        ))}
       </div>
     </div>
   );
