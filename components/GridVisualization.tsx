@@ -158,18 +158,22 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
     
     // Funkcja do określania, czy segment jest aktywny
     const isSegmentActive = (position: {row: number, col: number, globalIndex: number}) => {
-      // Segmenty wygasają od góry do dołu, a w obrębie wiersza od lewej do prawej
-      // Porządek obliczamy na podstawie pozycji (row, col)
+      // Poprawiona wartość porządkowa uwzględniająca offset pierwszego wiersza
+      let orderValue;
       
-      // Dla jasności obliczamy "wartość porządkową" dla każdej pozycji (mniejsza wartość = wygasa wcześniej)
-      // Pierwszy wiersz (row=0) ma wartości od 0 do (firstRowElements - 1)
-      // Drugi wiersz (row=1) ma wartości od firstRowElements do (firstRowElements + cols - 1)
-      // itd.
+      // Pierwszy wiersz może być niepełny i wyrównany do prawej
+      const firstRowElements = totalSegments % cols || cols;
+      const firstRowOffset = cols - firstRowElements;
       
-      const orderValue = position.row * cols + position.col;
+      if (position.row === 0) {
+        // Dla pierwszego wiersza - uwzględniamy offset
+        orderValue = position.col - firstRowOffset;
+      } else {
+        // Dla pozostałych wierszy
+        orderValue = firstRowElements + (position.row - 1) * cols + position.col;
+      }
       
       // Teraz porównujemy wartość porządkową z liczbą nieaktywnych segmentów
-      // Im większa wartość orderValue, tym później segment powinien wygasnąć
       const inactiveSegments = totalSegments - activeSegments;
       
       return orderValue >= inactiveSegments;
