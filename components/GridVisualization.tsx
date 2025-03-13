@@ -96,9 +96,10 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
       currentColor = `hsl(${h}, ${s}%, ${l}%)`;
     }
     
-    // Funkcja do określania, czy segment jest aktywny
+    // ZMIANA: Funkcja do określania, czy segment jest aktywny
+    // Zmieniona, aby segmenty zanikały od góry do dołu
     const isSegmentActive = (index: number) => {
-      return index < activeSegments;
+      return index >= totalSegments - activeSegments;
     };
     
     // Tworzymy tablicę segmentów, wypełniając wiersze od góry do dołu
