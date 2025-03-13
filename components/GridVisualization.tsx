@@ -96,12 +96,6 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
       currentColor = `hsl(${h}, ${s}%, ${l}%)`;
     }
     
-    // ZMIANA: Funkcja do określania, czy segment jest aktywny
-    // Zmieniona, aby segmenty zanikały od góry do dołu
-    const isSegmentActive = (index: number) => {
-      return index >= totalSegments - activeSegments;
-    };
-    
     // Tworzymy tablicę segmentów, wypełniając wiersze od góry do dołu
     const segments = useMemo(() => {
       // Obliczamy, czy pierwszy wiersz będzie niepełny
@@ -153,15 +147,18 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
       return containerStyle;
     };
     
-    // Generujemy układ siatki
+    // Generujemy układ siatki z pierwszym wierszem wyrównanym do prawej strony
     const gridLayout = useMemo(() => {
       const layout: SegmentPosition[] = [];
       
-      // Pierwszy wiersz (może być niepełny)
-      segments.firstRowSegments.forEach((index) => {
+      // Pierwszy wiersz (może być niepełny) - wyrównany do prawej
+      const firstRowElements = totalSegments % cols || cols;
+      const firstRowOffset = cols - firstRowElements; // Offset dla wyrównania do prawej
+      
+      segments.firstRowSegments.forEach((index, i) => {
         layout.push({
           index,
-          gridColumnStart: index % cols + 1,
+          gridColumnStart: firstRowOffset + i + 1, // Wyrównanie do prawej
           gridRow: 1
         });
       });
@@ -169,7 +166,7 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
       // Pozostałe wiersze (pełne)
       segments.remainingSegments.forEach((index, i) => {
         const row = Math.floor(i / cols) + 2; // +2 bo pierwszy wiersz już zajęty
-        const col = (i % cols) + 1;
+        const col = (i % cols) + 1; // Od lewej do prawej
         
         layout.push({
           index,
@@ -179,7 +176,26 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
       });
       
       return layout;
-    }, [segments, cols]);
+    }, [segments, cols, totalSegments]);
+    
+    // Funkcja do określania, czy segment jest aktywny - odliczanie od lewej do prawej
+    const isSegmentActive = (index: number, position: { gridColumnStart: number, gridRow: number }) => {
+      const firstRowElements = totalSegments % cols || cols;
+      const firstRowOffset = cols - firstRowElements; // Offset dla wyrównania do prawej
+      
+      // Obliczamy numer porządkowy segmentu, idąc od lewej do prawej, od góry do dołu
+      let orderNumber;
+      if (position.gridRow === 1) {
+        // Dla pierwszego wiersza
+        orderNumber = position.gridColumnStart - firstRowOffset - 1;
+      } else {
+        // Dla pozostałych wierszy
+        orderNumber = firstRowElements + (position.gridRow - 2) * cols + position.gridColumnStart - 1;
+      }
+      
+      // Aktywne są segmenty o numerach porządkowych mniejszych od activeSegments
+      return orderNumber < activeSegments;
+    };
     
     return (
       <div style={getContainerStyle()} className="mb-4">
@@ -187,7 +203,7 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
           <div
             key={index}
             style={{
-              backgroundColor: isSegmentActive(index) ? currentColor : inactiveColor,
+              backgroundColor: isSegmentActive(index, { gridColumnStart, gridRow }) ? currentColor : inactiveColor,
               gridColumnStart,
               gridRow,
               transition: 'background-color 0.3s ease'
