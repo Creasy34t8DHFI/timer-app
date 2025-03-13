@@ -12,6 +12,13 @@ interface GridVisualizationProps {
   fullScreen: boolean;
 }
 
+// Interfejs dla pozycji segmentu w siatce
+interface SegmentPosition {
+  index: number;
+  gridColumnStart: number;
+  gridRow: number;
+}
+
 export const GridVisualization: React.FC<GridVisualizationProps> = memo(
   ({ timeLeft, totalTime, getSegmentCount, getSegmentColor, colorGradient, showDividers, squareSegments, fullScreen }) => {
     // Określ podstawowy kolor zielony dla segmentów (kolor z Tailwind green-500)
@@ -147,7 +154,7 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
     
     // Generujemy układ siatki
     const gridLayout = useMemo(() => {
-      const layout = [];
+      const layout: SegmentPosition[] = [];
       
       // Pierwszy wiersz (może być niepełny)
       segments.firstRowSegments.forEach((index) => {
