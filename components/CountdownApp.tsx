@@ -6,7 +6,7 @@ import { SetupScreen } from './SetupScreen';
 import { CountdownScreen } from './CountdownScreen';
 
 interface WakeLockSentinel {
-  release: () => void;
+  release: () => Promise<void>;
 }
 
 export default function CountdownApp() {
@@ -81,16 +81,15 @@ export default function CountdownApp() {
       }
     };
 
-    const releaseWakeLock = () => {
+    const releaseWakeLock = async () => {
       if (wakeLockRef.current) {
-        wakeLockRef.current.release()
-          .then(() => {
-            wakeLockRef.current = null;
-            console.log('Wake Lock zwolniony');
-          })
-          .catch((err) => {
-            console.error('Błąd zwalniania Wake Lock:', err);
-          });
+        try {
+          await wakeLockRef.current.release();
+          wakeLockRef.current = null;
+          console.log('Wake Lock zwolniony');
+        } catch (err) {
+          console.error('Błąd zwalniania Wake Lock:', err);
+        }
       }
     };
 
