@@ -1,9 +1,10 @@
 // hooks/useAlarm.ts
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 export interface AlarmSettings {
   vibration: boolean;
   vibrationDuration: number;
+  vibrationPattern: 'short' | 'medium' | 'long' | 'double' | 'sos';
   sound: boolean;
   soundFile: string | null;
   flash: boolean;
@@ -12,55 +13,156 @@ export interface AlarmSettings {
 
 interface UseAlarmOptions {
   onFlashStateChange?: (isFlashing: boolean) => void;
+  flashSpeed?: number;
 }
 
 export const useAlarm = (options: UseAlarmOptions = {}) => {
   const [settings, setSettings] = useState<AlarmSettings>({
-    vibration: true,
+    vibration: false,
     vibrationDuration: 1000,
+    vibrationPattern: 'medium',
     sound: false,
     soundFile: null,
-    flash: false,
-    flashDuration: 3000
+    flash: true,
+    flashDuration: 5000
   });
   
   const [isFlashing, setIsFlashing] = useState(false);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
+  const flashIntervalRef = useRef<number | null>(null);
   
   // Powiadamiaj o zmianie stanu migania
   useEffect(() => {
     options.onFlashStateChange?.(isFlashing);
   }, [isFlashing, options]);
   
-  // Funkcja do wyzwalania alarmu
-  const triggerAlarm = () => {
-    if (settings.vibration && 'vibrate' in navigator) {
-      navigator.vibrate([settings.vibrationDuration]);
+  // Uzyskaj odpowiedni wzór wibracji na podstawie wybranego ustawienia
+  const getVibrationPattern = () => {
+    switch(settings.vibrationPattern) {
+      case 'short':
+        return [300];
+      case 'medium':
+        return [500];
+      case 'long':
+        return [1000];
+      case 'double':
+        return [300, 200, 300];
+      case 'sos':
+        return [200, 100, 200, 100, 200, 300, 500, 300, 500, 300, 200, 100, 200, 100, 200];
+      default:
+        return [settings.vibrationDuration];
     }
-    
+  };
+  
+  // Funkcja do wyzwalania alarmu wibracji
+  const triggerVibration = () => {
+    if (settings.vibration && 'vibrate' in navigator) {
+      const pattern = getVibrationPattern();
+      navigator.vibrate(pattern);
+      
+      // Powtórz wibrację kilka razy, aby była bardziej zauważalna
+      let repeatCount = 0;
+      const maxRepeats = 5;
+      
+      const vibrateInterval = setInterval(() => {
+        if (repeatCount < maxRepeats) {
+          navigator.vibrate(pattern);
+          repeatCount++;
+        } else {
+          clearInterval(vibrateInterval);
+        }
+      }, 1500);
+      
+      return () => clearInterval(vibrateInterval);
+    }
+    return () => {};
+  };
+  
+  // Funkcja do wyzwalania alarmu migania
+  const triggerFlash = () => {
     if (settings.flash) {
       setIsFlashing(true);
-      const flashInterval = setInterval(() => {
-        setIsFlashing(prev => !prev);
-      }, 1000);
       
+      // Użyj podanej prędkości migania lub domyślnej wartości 500ms
+      const flashSpeed = options.flashSpeed || 500;
+      
+      // Zatrzymaj poprzedni interwał, jeśli istnieje
+      if (flashIntervalRef.current !== null) {
+        clearInterval(flashIntervalRef.current);
+      }
+      
+      // Utwórz nowy interwał migania
+      flashIntervalRef.current = window.setInterval(() => {
+        setIsFlashing(prev => !prev);
+      }, flashSpeed) as unknown as number;
+      
+      // Zatrzymaj miganie po określonym czasie
       setTimeout(() => {
-        clearInterval(flashInterval);
+        if (flashIntervalRef.current !== null) {
+          clearInterval(flashIntervalRef.current);
+          flashIntervalRef.current = null;
+        }
         setIsFlashing(false);
       }, settings.flashDuration);
+      
+      return () => {
+        if (flashIntervalRef.current !== null) {
+          clearInterval(flashIntervalRef.current);
+          flashIntervalRef.current = null;
+        }
+        setIsFlashing(false);
+      };
     }
-    
+    return () => {};
+  };
+  
+  // Funkcja do wyzwalania alarmu dźwiękowego
+  const triggerSound = () => {
     if (settings.sound && settings.soundFile) {
       if (audio) {
         audio.pause();
         audio.currentTime = 0;
-        audio.play().catch(console.error);
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(e => console.error("Błąd odtwarzania dźwięku:", e));
+        }
       } else {
         const newAudio = new Audio(settings.soundFile);
+        newAudio.loop = true;
+        const playPromise = newAudio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(e => console.error("Błąd odtwarzania dźwięku:", e));
+        }
         setAudio(newAudio);
-        newAudio.play().catch(console.error);
+        
+        // Zatrzymaj dźwięk po określonym czasie
+        setTimeout(() => {
+          newAudio.pause();
+          newAudio.currentTime = 0;
+        }, settings.flashDuration);
       }
+      
+      return () => {
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+      };
     }
+    return () => {};
+  };
+  
+  // Funkcja do wyzwalania wszystkich alarmów
+  const triggerAlarm = () => {
+    const stopVibration = triggerVibration();
+    const stopFlash = triggerFlash();
+    const stopSound = triggerSound();
+    
+    return () => {
+      stopVibration();
+      stopFlash();
+      stopSound();
+    };
   };
   
   // Funkcja do zmiany ustawień alarmu
@@ -84,8 +186,17 @@ export const useAlarm = (options: UseAlarmOptions = {}) => {
         audio.src = '';
       }
       
+      if (flashIntervalRef.current !== null) {
+        clearInterval(flashIntervalRef.current);
+        flashIntervalRef.current = null;
+      }
+      
       if (settings.soundFile && settings.soundFile.startsWith('blob:')) {
         URL.revokeObjectURL(settings.soundFile);
+      }
+      
+      if ('vibrate' in navigator) {
+        navigator.vibrate(0); // Zatrzymaj wszystkie wibracje
       }
     };
   }, [audio, settings.soundFile]);

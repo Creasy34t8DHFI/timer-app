@@ -1,7 +1,6 @@
 // components/CountdownApp.tsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useCountdown } from '../hooks/useCountdown';
-import { useSwipe } from '../hooks/useSwipe';
 import { useAlarm } from '../hooks/useAlarm';
 import { SetupScreen } from './SetupScreen';
 import { CountdownScreen } from './CountdownScreen';
@@ -10,9 +9,6 @@ interface WakeLockSentinel {
   release: () => void;
 }
 
-const VISUALIZATION_TYPES = ['grid', 'line', 'tank'] as const;
-type VisualizationType = typeof VISUALIZATION_TYPES[number];
-
 export default function CountdownApp() {
   // Stany aplikacji
   const [screen, setScreen] = useState('setup');
@@ -20,14 +16,17 @@ export default function CountdownApp() {
   const [inputMinutes, setInputMinutes] = useState('');
   const [inputSeconds, setInputSeconds] = useState('');
   const [targetTime, setTargetTime] = useState('');
-  const [visualizationType, setVisualizationType] = useState<VisualizationType>('grid');
+  const [visualizationType, setVisualizationType] = useState<'grid' | 'line' | 'tank'>('grid');
   const [scaleType, setScaleType] = useState<'minutes' | 'seconds' | 'custom'>('minutes');
   const [segmentCount, setSegmentCount] = useState(100);
   const [customSegments, setCustomSegments] = useState('');
   const [clockStyle, setClockStyle] = useState<'simple' | 'full' | 'combined'>('simple');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showTimeSelector, setShowTimeSelector] = useState(false);
-  const [colorGradient, setColorGradient] = useState(true);
+  const [colorGradient, setColorGradient] = useState(false);
+  const [showDividers, setShowDividers] = useState(true);
+  const [squareSegments, setSquareSegments] = useState(true);
+  const [flashSpeed, setFlashSpeed] = useState(500);
 
   // Hooki
   const { 
@@ -48,40 +47,14 @@ export default function CountdownApp() {
   } = useAlarm({
     onFlashStateChange: (flashing) => {
       // Umożliwia aktualizację stanu flashing w CountdownScreen
-    }
+    },
+    flashSpeed
   });
 
   // Referencje
   const lastTimerSettings = useRef({ minutes: 0, seconds: 0 });
   const countdownRef = useRef<HTMLDivElement>(null);
-
-  // Zmień typ wizualizacji po geście przesunięcia
-  const changeVisualizationType = (direction: 'left' | 'right') => {
-    const currentIndex = VISUALIZATION_TYPES.indexOf(visualizationType);
-    let newIndex;
-    
-    if (direction === 'left') {
-      newIndex = (currentIndex + 1) % VISUALIZATION_TYPES.length;
-    } else {
-      newIndex = (currentIndex - 1 + VISUALIZATION_TYPES.length) % VISUALIZATION_TYPES.length;
-    }
-    
-    setVisualizationType(VISUALIZATION_TYPES[newIndex]);
-  };
-
-  // Użyj hooka useSwipe do obsługi gestów przesuwania
-  useSwipe(countdownRef, {
-    onSwipeLeft: () => {
-      if (screen === 'countdown' && !isMenuOpen) {
-        changeVisualizationType('left');
-      }
-    },
-    onSwipeRight: () => {
-      if (screen === 'countdown' && !isMenuOpen) {
-        changeVisualizationType('right');
-      }
-    }
-  });
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   // Prevent scroll when menu is open
   useEffect(() => {
@@ -97,26 +70,46 @@ export default function CountdownApp() {
 
   // Utrzymanie włączonego ekranu podczas odliczania
   useEffect(() => {
-    let wakeLock: WakeLockSentinel | null = null;
-    
     const requestWakeLock = async () => {
       try {
         if ('wakeLock' in navigator) {
-          wakeLock = await (navigator as any).wakeLock.request('screen');
+          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+          console.log('Wake Lock aktywny');
         }
       } catch (err) {
         console.log('Wake Lock error:', err);
       }
     };
 
+    const releaseWakeLock = () => {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release()
+          .then(() => {
+            wakeLockRef.current = null;
+            console.log('Wake Lock zwolniony');
+          })
+          .catch((err) => {
+            console.error('Błąd zwalniania Wake Lock:', err);
+          });
+      }
+    };
+
     if (isRunning) {
       requestWakeLock();
+      
+      // Obsługa zdarzeń widoczności strony
+      document.addEventListener('visibilitychange', async () => {
+        if (document.visibilityState === 'visible' && wakeLockRef.current === null) {
+          requestWakeLock();
+        }
+      });
+    } else {
+      releaseWakeLock();
     }
 
     return () => {
-      if (wakeLock) {
-        wakeLock.release();
-      }
+      releaseWakeLock();
+      document.removeEventListener('visibilitychange', () => {});
     };
   }, [isRunning]);
 
@@ -142,6 +135,25 @@ export default function CountdownApp() {
     }
   }, []);
 
+  // Ustaw domyślne wartości przy pierwszym renderowaniu
+  useEffect(() => {
+    // Domyślne ustawienia aplikacji
+    setVisualizationType('grid');
+    setScaleType('minutes');
+    setColorGradient(false);
+    setShowDividers(true);
+    setSquareSegments(true);
+    
+    // Domyślne ustawienia alarmu
+    updateAlarmSettings({
+      vibration: false,
+      sound: false,
+      flash: true,
+      flashDuration: 5000,
+      vibrationPattern: 'medium'
+    });
+  }, []);
+
   // Funkcje pomocnicze
   const getTotalMinutes = () => Math.ceil(totalTime / 60);
   const getTotalSeconds = () => totalTime;
@@ -160,19 +172,14 @@ export default function CountdownApp() {
   // Funkcja do generowania kolorów gradientu od zielonego przez żółty do czerwonego
   const getSegmentColor = useCallback((index: number, activeSegments: number, totalSegments: number) => {
     if (!colorGradient) {
-      return index < activeSegments ? 'bg-green-500' : 'bg-gray-800';
-    }
-    
-    if (index >= activeSegments) {
-      return 'bg-gray-800';
+      return '#10B981'; // green-500
     }
     
     // Oblicz postęp segmentu w zakresie od 0 do 1
-    const segmentProgress = index / activeSegments;
+    const segmentProgress = index / (activeSegments - 1 || 1);
     
     // Gradient od zielonego (hue: 120) przez żółty (hue: 60) do czerwonego (hue: 0)
     // Dopasowujemy odcienie tak, aby zmiana była bardziej naturalna
-    // Zielony (0-0.6), Żółty (0.6-0.8), Pomarańczowy/Czerwony (0.8-1.0)
     let h, s, l;
     
     if (segmentProgress < 0.6) {
@@ -291,6 +298,12 @@ export default function CountdownApp() {
           setCustomSegments={setCustomSegments}
           colorGradient={colorGradient}
           setColorGradient={setColorGradient}
+          showDividers={showDividers}
+          setShowDividers={setShowDividers}
+          squareSegments={squareSegments}
+          setSquareSegments={setSquareSegments}
+          flashSpeed={flashSpeed}
+          setFlashSpeed={setFlashSpeed}
           getSegmentColor={getSegmentColor}
           alarmSettings={alarmSettings}
           onAlarmSettingsChange={updateAlarmSettings}

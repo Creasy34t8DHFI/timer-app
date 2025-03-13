@@ -37,19 +37,26 @@ export const AlarmSettings: React.FC<AlarmSettingsProps> = ({
           <span className="text-gray-400">Wibracje</span>
         </label>
         {settings.vibration && (
-          <input
-            type="number"
-            placeholder="Czas wibracji (ms)"
-            className="mt-2 w-full p-3 rounded bg-gray-800 text-white"
-            value={settings.vibrationDuration}
-            onChange={(e) => {
-              e.stopPropagation();
-              onSettingsChange({ 
-                vibrationDuration: parseInt(e.target.value) || 1000 
-              });
-            }}
-            onClick={(e) => e.stopPropagation()}
-          />
+          <div className="mt-2">
+            <label className="text-gray-400 text-sm block mb-1">Intensywność wibracji:</label>
+            <select
+              className="w-full p-3 rounded bg-gray-800 text-white"
+              value={settings.vibrationPattern}
+              onChange={(e) => {
+                e.stopPropagation();
+                onSettingsChange({ 
+                  vibrationPattern: e.target.value
+                });
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <option value="short">Krótkie</option>
+              <option value="medium">Średnie</option>
+              <option value="long">Długie</option>
+              <option value="double">Podwójne</option>
+              <option value="sos">SOS</option>
+            </select>
+          </div>
         )}
       </div>
 

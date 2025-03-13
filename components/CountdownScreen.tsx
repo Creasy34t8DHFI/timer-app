@@ -27,6 +27,12 @@ interface CountdownScreenProps {
   setCustomSegments: (value: string) => void;
   colorGradient: boolean;
   setColorGradient: (enabled: boolean) => void;
+  showDividers: boolean;
+  setShowDividers: (enabled: boolean) => void;
+  squareSegments: boolean;
+  setSquareSegments: (enabled: boolean) => void;
+  flashSpeed: number;
+  setFlashSpeed: (speed: number) => void;
   getSegmentColor: (index: number, activeSegments: number, totalSegments: number) => string;
   alarmSettings: AlarmSettings;
   onAlarmSettingsChange: (settings: Partial<AlarmSettings>) => void;
@@ -55,6 +61,12 @@ export const CountdownScreen = forwardRef<HTMLDivElement, CountdownScreenProps>(
     setCustomSegments,
     colorGradient,
     setColorGradient,
+    showDividers,
+    setShowDividers,
+    squareSegments,
+    setSquareSegments,
+    flashSpeed,
+    setFlashSpeed,
     getSegmentColor,
     alarmSettings,
     onAlarmSettingsChange,
@@ -90,6 +102,12 @@ export const CountdownScreen = forwardRef<HTMLDivElement, CountdownScreenProps>(
         setCustomSegments={setCustomSegments}
         colorGradient={colorGradient}
         setColorGradient={setColorGradient}
+        showDividers={showDividers}
+        setShowDividers={setShowDividers}
+        squareSegments={squareSegments}
+        setSquareSegments={setSquareSegments}
+        flashSpeed={flashSpeed}
+        setFlashSpeed={setFlashSpeed}
         alarmSettings={alarmSettings}
         onAlarmSettingsChange={onAlarmSettingsChange}
         onSoundFileChange={onSoundFileChange}
@@ -97,37 +115,45 @@ export const CountdownScreen = forwardRef<HTMLDivElement, CountdownScreenProps>(
         onReset={onReset}
       />
 
-      <div className="flex-1 flex flex-col items-center justify-start pt-16">
-        <ClockDisplay 
-          timeLeft={timeLeft} 
-          clockStyle={clockStyle} 
-        />
+      <div className="flex-1 flex flex-col items-center">
+        <div className="pt-10 pb-4">
+          <ClockDisplay 
+            timeLeft={timeLeft} 
+            clockStyle={clockStyle} 
+          />
+        </div>
 
-        {visualizationType === 'grid' && (
-          <GridVisualization 
-            timeLeft={timeLeft} 
-            totalTime={totalTime} 
-            getSegmentCount={getSegmentCount} 
-            getSegmentColor={getSegmentColor}
-            colorGradient={colorGradient}
-          />
-        )}
-        {visualizationType === 'line' && (
-          <LineVisualization 
-            timeLeft={timeLeft} 
-            totalTime={totalTime} 
-            getSegmentCount={getSegmentCount} 
-            getSegmentColor={getSegmentColor}
-            colorGradient={colorGradient}
-          />
-        )}
-        {visualizationType === 'tank' && (
-          <TankVisualization 
-            progress={timeLeft / totalTime} 
-            segments={getSegmentCount()}
-            colorGradient={colorGradient}
-          />
-        )}
+        <div className="flex-1 w-full">
+          {visualizationType === 'grid' && (
+            <GridVisualization 
+              timeLeft={timeLeft} 
+              totalTime={totalTime} 
+              getSegmentCount={getSegmentCount} 
+              getSegmentColor={getSegmentColor}
+              colorGradient={colorGradient}
+              showDividers={showDividers}
+              squareSegments={squareSegments}
+            />
+          )}
+          {visualizationType === 'line' && (
+            <LineVisualization 
+              timeLeft={timeLeft} 
+              totalTime={totalTime} 
+              getSegmentCount={getSegmentCount} 
+              getSegmentColor={getSegmentColor}
+              colorGradient={colorGradient}
+              showDividers={showDividers}
+            />
+          )}
+          {visualizationType === 'tank' && (
+            <TankVisualization 
+              progress={timeLeft / totalTime} 
+              segments={getSegmentCount()}
+              colorGradient={colorGradient}
+              showDividers={showDividers}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

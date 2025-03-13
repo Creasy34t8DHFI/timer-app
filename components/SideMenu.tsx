@@ -21,6 +21,12 @@ interface SideMenuProps {
   setCustomSegments: (value: string) => void;
   colorGradient: boolean;
   setColorGradient: (enabled: boolean) => void;
+  showDividers: boolean;
+  setShowDividers: (enabled: boolean) => void;
+  squareSegments: boolean;
+  setSquareSegments: (enabled: boolean) => void;
+  flashSpeed: number;
+  setFlashSpeed: (speed: number) => void;
   alarmSettings: AlarmSettings;
   onAlarmSettingsChange: (settings: Partial<AlarmSettings>) => void;
   onSoundFileChange: (file: File | null) => void;
@@ -43,6 +49,12 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   setCustomSegments,
   colorGradient,
   setColorGradient,
+  showDividers,
+  setShowDividers,
+  squareSegments,
+  setSquareSegments,
+  flashSpeed,
+  setFlashSpeed,
   alarmSettings,
   onAlarmSettingsChange,
   onSoundFileChange,
@@ -229,6 +241,36 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     <span className="text-gray-400">Kolorowy gradient</span>
                   </label>
                 </div>
+
+                <div>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={showDividers}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setShowDividers(e.target.checked);
+                      }}
+                      className="rounded bg-gray-800"
+                    />
+                    <span className="text-gray-400">Pokaż podziałkę</span>
+                  </label>
+                </div>
+
+                <div>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={squareSegments}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSquareSegments(e.target.checked);
+                      }}
+                      className="rounded bg-gray-800"
+                    />
+                    <span className="text-gray-400">Kwadratowe segmenty</span>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -241,6 +283,26 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                 onSettingsChange={onAlarmSettingsChange}
                 onSoundFileChange={onSoundFileChange}
               />
+
+              {/* Prędkość migania */}
+              {alarmSettings.flash && (
+                <div className="mt-4">
+                  <p className="text-gray-400 mb-2">Prędkość migania:</p>
+                  <input
+                    type="range"
+                    min="100"
+                    max="2000"
+                    step="100"
+                    value={flashSpeed}
+                    onChange={(e) => setFlashSpeed(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-gray-400 text-sm">
+                    <span>Szybko</span>
+                    <span>Wolno</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Sekcja Akcje */}
