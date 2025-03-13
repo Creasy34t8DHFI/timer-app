@@ -123,7 +123,7 @@ export const CountdownScreen = forwardRef<HTMLDivElement, CountdownScreenProps>(
   return (
     <div 
       ref={ref}
-      className={`h-screen flex flex-col ${isFlashing ? 'bg-white' : 'bg-black'}`}
+      className={`h-screen flex flex-col ${isFlashing ? 'bg-white' : 'bg-black'} overflow-hidden`}
       onClick={handleScreenTap}
     >
       <button

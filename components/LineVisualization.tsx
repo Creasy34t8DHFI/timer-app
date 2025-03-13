@@ -54,7 +54,7 @@ export const LineVisualization: React.FC<LineVisualizationProps> = memo(
     }
     
     // Wysokość komponentu w zależności od trybu pełnoekranowego
-    const containerHeight = fullScreen ? '100vh' : '70vh';
+    const containerHeight = fullScreen ? 'calc(100vh - 56px)' : '70vh';
     
     return (
       <div className={`mb-4 w-full flex flex-col items-center justify-center`} style={{ height: containerHeight }}>

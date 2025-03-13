@@ -94,26 +94,35 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
       return position < activeSegments;
     };
     
-    // Tworzymy tablicę segmentów, wypełniając wiersze od dołu
+    // Tworzymy tablicę segmentów, wypełniając wiersze od góry
     const segmentPositions = useMemo(() => {
       const positions = [];
       
       // Całkowita liczba wierszy
       const totalRows = rows;
       
-      // Dla każdego wiersza (zaczynając od dołu)
-      for (let row = totalRows - 1; row >= 0; row--) {
-        // Liczba segmentów w wierszu (ostatni wiersz może być niepełny)
-        const segmentsInRow = row === 0 
-          ? totalSegments - (totalRows - 1) * cols 
-          : cols;
-        
-        // Dla każdej kolumny w wierszu
-        for (let col = 0; col < segmentsInRow; col++) {
+      // Liczba segmentów w pierwszym wierszu (może być niepełna)
+      const firstRowSegments = totalSegments % cols || cols;
+      
+      // Dodajemy pierwszy (potencjalnie niepełny) wiersz
+      for (let col = 0; col < firstRowSegments; col++) {
+        positions.push({
+          row: 0,
+          col,
+          position: col
+        });
+      }
+      
+      // Indeks pozycji od którego zaczynamy dodawać pełne wiersze
+      let positionIndex = firstRowSegments;
+      
+      // Dodajemy pozostałe (pełne) wiersze
+      for (let row = 1; row < totalRows; row++) {
+        for (let col = 0; col < cols; col++) {
           positions.push({
             row,
             col,
-            position: (totalRows - 1 - row) * cols + col
+            position: positionIndex++
           });
         }
       }
@@ -127,7 +136,7 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
         display: 'grid',
         gap: showDividers ? '2px' : '0px',
         width: '100%',
-        height: fullScreen ? '100vh' : '70vh'
+        height: fullScreen ? 'calc(100vh - 56px)' : '70vh', // Odejmujemy wysokość paska systemowego Android
       };
       
       if (squareSegments) {
