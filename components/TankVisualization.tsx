@@ -6,22 +6,44 @@ interface TankVisualizationProps {
   segments: number;
   colorGradient?: boolean;
   showDividers?: boolean;
+  fullScreen?: boolean;
 }
 
 export const TankVisualization: React.FC<TankVisualizationProps> = memo(
-  ({ progress, segments, colorGradient = false, showDividers = true }) => {
+  ({ progress, segments, colorGradient = false, showDividers = true, fullScreen = false }) => {
     // Gradient kolorów dla zbiornika
     const getColor = () => {
       if (!colorGradient) return '#10B981'; // zielony (green-500)
       
       // Oblicz kolor na podstawie procentu wypełnienia
       // Od zielonego przez żółty do czerwonego
-      const hue = progress * 120; // 0 - czerwony, 120 - zielony
-      return `hsl(${hue}, 70%, 45%)`;
+      const timeProgress = 1 - progress;
+      let h, s, l;
+      
+      if (timeProgress < 0.6) {
+        // Zielony -> Żółto-zielony
+        h = 120 - (timeProgress / 0.6) * 60;
+        s = 70;
+        l = 45;
+      } else if (timeProgress < 0.8) {
+        // Żółto-zielony -> Żółty
+        h = 60 - ((timeProgress - 0.6) / 0.2) * 30;
+        s = 80;
+        l = 50;
+      } else {
+        // Żółty -> Czerwony
+        h = 30 - ((timeProgress - 0.8) / 0.2) * 30;
+        s = 90;
+        l = 45;
+      }
+      
+      return `hsl(${h}, ${s}%, ${l}%)`;
     };
     
+    const containerHeight = fullScreen ? '100vh' : '70vh';
+    
     return (
-      <div className="w-full h-[70vh] bg-gray-800 relative overflow-hidden">
+      <div className="w-full bg-gray-800 relative overflow-hidden" style={{ height: containerHeight }}>
         <div 
           className="absolute bottom-0 left-0 w-full" 
           style={{

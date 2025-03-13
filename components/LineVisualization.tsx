@@ -8,69 +8,68 @@ interface LineVisualizationProps {
   getSegmentColor: (index: number, activeSegments: number, totalSegments: number) => string;
   colorGradient: boolean;
   showDividers: boolean;
+  fullScreen: boolean;
 }
 
 export const LineVisualization: React.FC<LineVisualizationProps> = memo(
-  ({ timeLeft, totalTime, getSegmentCount, getSegmentColor, colorGradient, showDividers }) => {
+  ({ timeLeft, totalTime, getSegmentCount, getSegmentColor, colorGradient, showDividers, fullScreen }) => {
     const totalSegments = getSegmentCount();
     
-    // Oblicz czas trwania jednego segmentu
+    // Oblicz czas na segment i aktywne segmenty
     const segmentDuration = totalTime / totalSegments;
-    
-    // Oblicz liczbę aktywnych segmentów
     const activeSegments = Math.ceil(timeLeft / segmentDuration);
     
-    // Oblicz progres dla płynnego wygaszania segmentów
-    const currentSegmentProgress = 1 - ((timeLeft % segmentDuration) / segmentDuration);
+    // Oblicz kolor dla wszystkich aktywnych segmentów (gradient zależy od czasu)
+    const timeProgress = 1 - (timeLeft / totalTime);
     
     // Określ podstawowy kolor zielony dla segmentów (kolor z Tailwind green-500)
     const baseGreenColor = '#10B981';
     const inactiveColor = '#1F2937'; // bg-gray-800
     
-    // Funkcja do obliczania koloru segmentu
-    const calculateSegmentColor = (index: number) => {
-      // Jeśli segment jest nieaktywny (już wygaszony)
-      if (index >= activeSegments) {
-        return inactiveColor;
-      }
-      
-      // Jeśli gradient jest włączony, użyj funkcji getSegmentColor dla aktywnych segmentów
-      if (colorGradient) {
-        return getSegmentColor(activeSegments - index - 1, activeSegments, totalSegments);
-      }
-      
-      // Domyślnie użyj zielonego koloru dla aktywnych segmentów
-      return baseGreenColor;
-    };
+    // Oblicz kolor na podstawie pozostałego czasu (nie na podstawie indeksu segmentu)
+    let currentColor = baseGreenColor;
     
-    // Funkcja do obliczania opacity dla płynnego wygaszania
-    const calculateOpacity = (index: number) => {
-      if (index < activeSegments - 1) {
-        return 1; // Pełna nieprzezroczystość dla w pełni aktywnych segmentów
+    if (colorGradient) {
+      // Od zielonego (początek) do czerwonego (koniec)
+      let h, s, l;
+      
+      if (timeProgress < 0.6) {
+        // Zielony -> Żółto-zielony
+        h = 120 - (timeProgress / 0.6) * 60;
+        s = 70;
+        l = 45;
+      } else if (timeProgress < 0.8) {
+        // Żółto-zielony -> Żółty
+        h = 60 - ((timeProgress - 0.6) / 0.2) * 30;
+        s = 80;
+        l = 50;
+      } else {
+        // Żółty -> Czerwony
+        h = 30 - ((timeProgress - 0.8) / 0.2) * 30;
+        s = 90;
+        l = 45;
       }
       
-      if (index === activeSegments - 1) {
-        return 1 - currentSegmentProgress; // Płynne wygaszanie dla aktualnie gasnącego segmentu
-      }
-      
-      return 0; // Pełna przezroczystość dla wygaszonych segmentów
-    };
+      currentColor = `hsl(${h}, ${s}%, ${l}%)`;
+    }
+    
+    // Wysokość komponentu w zależności od trybu pełnoekranowego
+    const containerHeight = fullScreen ? '100vh' : '70vh';
     
     return (
-      <div className="mb-4 w-full h-[70vh] flex flex-col items-center justify-center">
+      <div className={`mb-4 w-full flex flex-col items-center justify-center`} style={{ height: containerHeight }}>
         <div className="h-20 bg-gray-800 relative flex w-full">
           {[...Array(totalSegments)].map((_, index) => {
-            // Odwracamy indeks, aby segmenty gasły od lewej do prawej
-            const reversedIndex = totalSegments - index - 1;
+            // Używamy odwróconego indeksu, aby segmenty gasły od lewej do prawej
+            const isActive = index < activeSegments;
             
             return (
               <div
-                key={reversedIndex}
+                key={index}
                 className={showDividers ? "flex-1 border-r border-black" : "flex-1"}
                 style={{
-                  backgroundColor: calculateSegmentColor(reversedIndex),
-                  opacity: calculateOpacity(reversedIndex),
-                  transition: 'opacity 0.5s ease-out'
+                  backgroundColor: isActive ? currentColor : inactiveColor,
+                  transition: 'background-color 0.3s ease'
                 }}
               />
             );

@@ -25,6 +25,8 @@ interface SideMenuProps {
   setShowDividers: (enabled: boolean) => void;
   squareSegments: boolean;
   setSquareSegments: (enabled: boolean) => void;
+  fullScreen: boolean;
+  setFullScreen: (enabled: boolean) => void;
   flashSpeed: number;
   setFlashSpeed: (speed: number) => void;
   alarmSettings: AlarmSettings;
@@ -53,6 +55,8 @@ export const SideMenu: React.FC<SideMenuProps> = ({
   setShowDividers,
   squareSegments,
   setSquareSegments,
+  fullScreen,
+  setFullScreen,
   flashSpeed,
   setFlashSpeed,
   alarmSettings,
@@ -270,6 +274,27 @@ export const SideMenu: React.FC<SideMenuProps> = ({
                     />
                     <span className="text-gray-400">Kwadratowe segmenty</span>
                   </label>
+                </div>
+
+                <div>
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={fullScreen}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setFullScreen(e.target.checked);
+                        onClose(); // Zamknij menu po włączeniu pełnego ekranu
+                      }}
+                      className="rounded bg-gray-800"
+                    />
+                    <span className="text-gray-400">Pełny ekran</span>
+                  </label>
+                  {fullScreen && (
+                    <p className="text-gray-500 text-sm mt-1">
+                      Dotknij ekranu, aby pokazać zegar. Podwójne tapnięcie wyłącza tryb pełnoekranowy.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

@@ -30,6 +30,7 @@ export const useAlarm = (options: UseAlarmOptions = {}) => {
   const [isFlashing, setIsFlashing] = useState(false);
   const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const flashIntervalRef = useRef<number | null>(null);
+  const vibrationIntervalRef = useRef<number | null>(null);
   
   // Powiadamiaj o zmianie stanu migania
   useEffect(() => {
@@ -64,37 +65,49 @@ export const useAlarm = (options: UseAlarmOptions = {}) => {
       let repeatCount = 0;
       const maxRepeats = 5;
       
-      const vibrateInterval = setInterval(() => {
+      if (vibrationIntervalRef.current !== null) {
+        clearInterval(vibrationIntervalRef.current);
+      }
+      
+      vibrationIntervalRef.current = window.setInterval(() => {
         if (repeatCount < maxRepeats) {
           navigator.vibrate(pattern);
           repeatCount++;
         } else {
-          clearInterval(vibrateInterval);
+          if (vibrationIntervalRef.current !== null) {
+            clearInterval(vibrationIntervalRef.current);
+            vibrationIntervalRef.current = null;
+          }
         }
-      }, 1500);
+      }, 1500) as unknown as number;
       
-      return () => clearInterval(vibrateInterval);
+      return () => {
+        if (vibrationIntervalRef.current !== null) {
+          clearInterval(vibrationIntervalRef.current);
+          vibrationIntervalRef.current = null;
+        }
+        if ('vibrate' in navigator) {
+          navigator.vibrate(0); // Zatrzymaj wszystkie wibracje
+        }
+      };
     }
     return () => {};
   };
   
-  // Funkcja do wyzwalania alarmu migania
+  // Funkcja do wyzwalania alarmu migania - prosta implementacja
   const triggerFlash = () => {
     if (settings.flash) {
-      setIsFlashing(true);
-      
-      // Użyj podanej prędkości migania lub domyślnej wartości 500ms
-      const flashSpeed = options.flashSpeed || 500;
-      
-      // Zatrzymaj poprzedni interwał, jeśli istnieje
+      // Zatrzymaj poprzedni interval jeśli istnieje
       if (flashIntervalRef.current !== null) {
         clearInterval(flashIntervalRef.current);
+        flashIntervalRef.current = null;
       }
       
-      // Utwórz nowy interwał migania
+      // Ustaw stały interval migania co 500ms - prostszy i bardziej niezawodny
+      setIsFlashing(true);
       flashIntervalRef.current = window.setInterval(() => {
         setIsFlashing(prev => !prev);
-      }, flashSpeed) as unknown as number;
+      }, 500) as unknown as number;
       
       // Zatrzymaj miganie po określonym czasie
       setTimeout(() => {
@@ -189,6 +202,11 @@ export const useAlarm = (options: UseAlarmOptions = {}) => {
       if (flashIntervalRef.current !== null) {
         clearInterval(flashIntervalRef.current);
         flashIntervalRef.current = null;
+      }
+      
+      if (vibrationIntervalRef.current !== null) {
+        clearInterval(vibrationIntervalRef.current);
+        vibrationIntervalRef.current = null;
       }
       
       if (settings.soundFile && settings.soundFile.startsWith('blob:')) {
