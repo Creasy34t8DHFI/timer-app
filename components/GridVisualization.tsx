@@ -90,78 +90,98 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
     }
     
     // Funkcja do określania, czy segment jest aktywny
-    const isSegmentActive = (position: number) => {
-      return position < activeSegments;
+    const isSegmentActive = (index: number) => {
+      return index < activeSegments;
     };
     
-    // Tworzymy tablicę segmentów, wypełniając wiersze od góry
-    const segmentPositions = useMemo(() => {
-      const positions = [];
+    // Tworzymy tablicę segmentów, wypełniając wiersze od góry do dołu
+    const segments = useMemo(() => {
+      // Obliczamy, czy pierwszy wiersz będzie niepełny
+      const firstRowElements = totalSegments % cols || cols;
+      const firstRowSegments = Array(firstRowElements).fill(0).map((_, i) => i);
       
-      // Całkowita liczba wierszy
-      const totalRows = rows;
+      // Tworzymy pozostałe segmenty, które zostaną wypełnione wiersz po wierszu
+      const remainingSegments = Array(totalSegments - firstRowElements)
+        .fill(0)
+        .map((_, i) => i + firstRowElements);
       
-      // Liczba segmentów w pierwszym wierszu (może być niepełna)
-      const firstRowSegments = totalSegments % cols || cols;
-      
-      // Dodajemy pierwszy (potencjalnie niepełny) wiersz
-      for (let col = 0; col < firstRowSegments; col++) {
-        positions.push({
-          row: 0,
-          col,
-          position: col
-        });
-      }
-      
-      // Indeks pozycji od którego zaczynamy dodawać pełne wiersze
-      let positionIndex = firstRowSegments;
-      
-      // Dodajemy pozostałe (pełne) wiersze
-      for (let row = 1; row < totalRows; row++) {
-        for (let col = 0; col < cols; col++) {
-          positions.push({
-            row,
-            col,
-            position: positionIndex++
-          });
-        }
-      }
-      
-      return positions;
-    }, [cols, rows, totalSegments]);
+      return { firstRowSegments, remainingSegments };
+    }, [totalSegments, cols]);
     
     // Oblicz wysokość kontenera
     const getContainerStyle = () => {
       const containerStyle: React.CSSProperties = {
         display: 'grid',
-        gap: showDividers ? '2px' : '0px',
+        gap: showDividers ? '1px' : '0px',
         width: '100%',
-        height: fullScreen ? 'calc(100vh - 56px)' : '70vh', // Odejmujemy wysokość paska systemowego Android
+        height: fullScreen ? 'calc(100vh - 40px)' : '75vh',
       };
       
       if (squareSegments) {
-        // Dla kwadratowych segmentów, upewnij się, że cały grid mieści się na ekranie
-        containerStyle.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
-        containerStyle.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
-        containerStyle.aspectRatio = `${cols}/${rows}`;
+        // Dla kwadratowych segmentów
+        containerStyle.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        
+        // Oblicz liczbę wierszy potrzebnych do wyświetlenia wszystkich segmentów
+        const neededRows = Math.ceil(totalSegments / cols);
+        
+        // Definiujemy wiersze - pierwszy może być niepełny
+        const firstRowFr = segments.firstRowSegments.length / cols;
+        const rowsTemplate = `${firstRowFr}fr`;
+        
+        if (neededRows > 1) {
+          containerStyle.gridTemplateRows = `${rowsTemplate} repeat(${neededRows - 1}, 1fr)`;
+        } else {
+          containerStyle.gridTemplateRows = rowsTemplate;
+        }
+        
+        // Ważne: dodajemy dodatkową właściwość, aby segmenty były kwadratowe
+        containerStyle.aspectRatio = `${cols}/${neededRows}`;
         containerStyle.margin = '0 auto';
       } else {
-        // Dla elastycznych segmentów, rozciągnij na całą dostępną przestrzeń
+        // Dla elastycznych segmentów
         containerStyle.gridTemplateColumns = `repeat(${cols}, 1fr)`;
       }
       
       return containerStyle;
     };
     
+    // Generujemy układ siatki
+    const gridLayout = useMemo(() => {
+      const layout = [];
+      
+      // Pierwszy wiersz (może być niepełny)
+      segments.firstRowSegments.forEach((index) => {
+        layout.push({
+          index,
+          gridColumnStart: index % cols + 1,
+          gridRow: 1
+        });
+      });
+      
+      // Pozostałe wiersze (pełne)
+      segments.remainingSegments.forEach((index, i) => {
+        const row = Math.floor(i / cols) + 2; // +2 bo pierwszy wiersz już zajęty
+        const col = (i % cols) + 1;
+        
+        layout.push({
+          index,
+          gridColumnStart: col,
+          gridRow: row
+        });
+      });
+      
+      return layout;
+    }, [segments, cols]);
+    
     return (
       <div style={getContainerStyle()} className="mb-4">
-        {segmentPositions.map(({ position }) => (
+        {gridLayout.map(({ index, gridColumnStart, gridRow }) => (
           <div
-            key={position}
+            key={index}
             style={{
-              backgroundColor: isSegmentActive(position) ? currentColor : inactiveColor,
-              aspectRatio: squareSegments ? '1/1' : 'auto',
-              opacity: 1, // Usuwamy płynne wygaszanie - segmenty mają być albo włączone, albo wyłączone
+              backgroundColor: isSegmentActive(index) ? currentColor : inactiveColor,
+              gridColumnStart,
+              gridRow,
               transition: 'background-color 0.3s ease'
             }}
             className={showDividers ? 'border border-black' : ''}

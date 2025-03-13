@@ -40,7 +40,7 @@ export const TankVisualization: React.FC<TankVisualizationProps> = memo(
       return `hsl(${h}, ${s}%, ${l}%)`;
     };
     
-    const containerHeight = fullScreen ? 'calc(100vh - 56px)' : '70vh';
+    const containerHeight = fullScreen ? 'calc(100vh - 40px)' : '75vh';
     
     return (
       <div className="w-full bg-gray-800 relative overflow-hidden" style={{ height: containerHeight }}>

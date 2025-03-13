@@ -54,13 +54,13 @@ export const LineVisualization: React.FC<LineVisualizationProps> = memo(
     }
     
     // Wysokość komponentu w zależności od trybu pełnoekranowego
-    const containerHeight = fullScreen ? 'calc(100vh - 56px)' : '70vh';
+    const containerHeight = fullScreen ? 'calc(100vh - 40px)' : '75vh';
     
     return (
       <div className={`mb-4 w-full flex flex-col items-center justify-center`} style={{ height: containerHeight }}>
         <div className="h-20 bg-gray-800 relative flex w-full">
           {[...Array(totalSegments)].map((_, index) => {
-            // Używamy odwróconego indeksu, aby segmenty gasły od lewej do prawej
+            // Używamy indeksu, aby segmenty gasły od lewej do prawej
             const isActive = index < activeSegments;
             
             return (

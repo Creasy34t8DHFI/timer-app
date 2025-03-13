@@ -169,7 +169,7 @@ export const CountdownScreen = forwardRef<HTMLDivElement, CountdownScreenProps>(
       <div className="flex-1 flex flex-col items-center">
         {/* Pokaż zegar, jeśli nie jesteśmy w trybie pełnoekranowym lub tymczasowo pokazujemy zegar */}
         {(!fullScreen || showTempClock) && (
-          <div className={`pt-10 pb-4 ${showTempClock ? 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 bg-black bg-opacity-70 p-6 rounded-lg' : ''}`}>
+          <div className={`pt-6 pb-3 ${showTempClock ? 'absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 bg-black bg-opacity-70 p-6 rounded-lg' : ''}`}>
             <ClockDisplay 
               timeLeft={timeLeft} 
               clockStyle={clockStyle} 
@@ -177,7 +177,7 @@ export const CountdownScreen = forwardRef<HTMLDivElement, CountdownScreenProps>(
           </div>
         )}
 
-        <div className={`${fullScreen ? 'w-full h-full' : 'flex-1 w-full'}`}>
+        <div className={`${fullScreen ? 'w-full h-full' : 'w-full flex-1'}`}>
           {visualizationType === 'grid' && (
             <GridVisualization 
               timeLeft={timeLeft} 
