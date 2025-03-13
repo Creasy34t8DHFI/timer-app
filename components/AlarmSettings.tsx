@@ -41,11 +41,13 @@ export const AlarmSettings: React.FC<AlarmSettingsProps> = ({
             <label className="text-gray-400 text-sm block mb-1">Intensywność wibracji:</label>
             <select
               className="w-full p-3 rounded bg-gray-800 text-white"
-              value={settings.vibrationPattern}
+              value={settings.vibrationPattern || 'medium'}
               onChange={(e) => {
                 e.stopPropagation();
+                // Ponieważ wartości select zgadzają się z typem, możemy rzutować
+                const value = e.target.value as 'short' | 'medium' | 'long' | 'double' | 'sos';
                 onSettingsChange({ 
-                  vibrationPattern: e.target.value
+                  vibrationPattern: value
                 });
               }}
               onClick={(e) => e.stopPropagation()}
