@@ -10,7 +10,7 @@ interface SwipeOptions {
 }
 
 export const useSwipe = (
-  elementRef: RefObject<HTMLElement>,
+  elementRef: RefObject<HTMLElement | null>,
   options: SwipeOptions = {}
 ) => {
   useEffect(() => {
