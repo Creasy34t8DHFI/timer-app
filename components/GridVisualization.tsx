@@ -96,18 +96,41 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
       currentColor = `hsl(${h}, ${s}%, ${l}%)`;
     }
     
-    // Tworzymy tablicę segmentów, wypełniając wiersze od góry do dołu
-    const segments = useMemo(() => {
-      // Obliczamy, czy pierwszy wiersz będzie niepełny
+    // Tworzymy tablicę segmentów z pozycjami w siatce
+    const gridPositions = useMemo(() => {
+      const positions: {row: number, col: number, globalIndex: number}[] = [];
+      let globalIndex = 0;
+      
+      // Pierwszy wiersz może być niepełny
       const firstRowElements = totalSegments % cols || cols;
-      const firstRowSegments = Array(firstRowElements).fill(0).map((_, i) => i);
+      const firstRowOffset = cols - firstRowElements; // Offset dla wyrównania do prawej
       
-      // Tworzymy pozostałe segmenty, które zostaną wypełnione wiersz po wierszu
-      const remainingSegments = Array(totalSegments - firstRowElements)
-        .fill(0)
-        .map((_, i) => i + firstRowElements);
+      // Pierwszy wiersz
+      for (let col = 0; col < firstRowElements; col++) {
+        positions.push({
+          row: 0,
+          col: firstRowOffset + col,
+          globalIndex: globalIndex++
+        });
+      }
       
-      return { firstRowSegments, remainingSegments };
+      // Pozostałe wiersze
+      const remainingElements = totalSegments - firstRowElements;
+      const fullRows = Math.ceil(remainingElements / cols);
+      
+      for (let row = 1; row <= fullRows; row++) {
+        for (let col = 0; col < cols; col++) {
+          if (globalIndex < totalSegments) {
+            positions.push({
+              row,
+              col,
+              globalIndex: globalIndex++
+            });
+          }
+        }
+      }
+      
+      return positions;
     }, [totalSegments, cols]);
     
     // Oblicz wysokość kontenera
@@ -117,95 +140,50 @@ export const GridVisualization: React.FC<GridVisualizationProps> = memo(
         gap: showDividers ? '1px' : '0px',
         width: '100%',
         height: fullScreen ? 'calc(100vh - 40px)' : '75vh',
+        gridTemplateColumns: `repeat(${cols}, 1fr)`,
       };
       
       if (squareSegments) {
-        // Dla kwadratowych segmentów
-        containerStyle.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-        
-        // Oblicz liczbę wierszy potrzebnych do wyświetlenia wszystkich segmentów
+        // Definiujemy wiersze
         const neededRows = Math.ceil(totalSegments / cols);
-        
-        // Definiujemy wiersze - pierwszy może być niepełny
-        const firstRowFr = segments.firstRowSegments.length / cols;
-        const rowsTemplate = `${firstRowFr}fr`;
-        
-        if (neededRows > 1) {
-          containerStyle.gridTemplateRows = `${rowsTemplate} repeat(${neededRows - 1}, 1fr)`;
-        } else {
-          containerStyle.gridTemplateRows = rowsTemplate;
-        }
+        containerStyle.gridTemplateRows = `repeat(${neededRows}, 1fr)`;
         
         // Ważne: dodajemy dodatkową właściwość, aby segmenty były kwadratowe
         containerStyle.aspectRatio = `${cols}/${neededRows}`;
         containerStyle.margin = '0 auto';
-      } else {
-        // Dla elastycznych segmentów
-        containerStyle.gridTemplateColumns = `repeat(${cols}, 1fr)`;
       }
       
       return containerStyle;
     };
     
-    // Generujemy układ siatki z pierwszym wierszem wyrównanym do prawej strony
-    const gridLayout = useMemo(() => {
-      const layout: SegmentPosition[] = [];
+    // Funkcja do określania, czy segment jest aktywny
+    const isSegmentActive = (position: {row: number, col: number, globalIndex: number}) => {
+      // Segmenty wygasają od góry do dołu, a w obrębie wiersza od lewej do prawej
+      // Porządek obliczamy na podstawie pozycji (row, col)
       
-      // Pierwszy wiersz (może być niepełny) - wyrównany do prawej
-      const firstRowElements = totalSegments % cols || cols;
-      const firstRowOffset = cols - firstRowElements; // Offset dla wyrównania do prawej
+      // Dla jasności obliczamy "wartość porządkową" dla każdej pozycji (mniejsza wartość = wygasa wcześniej)
+      // Pierwszy wiersz (row=0) ma wartości od 0 do (firstRowElements - 1)
+      // Drugi wiersz (row=1) ma wartości od firstRowElements do (firstRowElements + cols - 1)
+      // itd.
       
-      segments.firstRowSegments.forEach((index, i) => {
-        layout.push({
-          index,
-          gridColumnStart: firstRowOffset + i + 1, // Wyrównanie do prawej
-          gridRow: 1
-        });
-      });
+      const orderValue = position.row * cols + position.col;
       
-      // Pozostałe wiersze (pełne)
-      segments.remainingSegments.forEach((index, i) => {
-        const row = Math.floor(i / cols) + 2; // +2 bo pierwszy wiersz już zajęty
-        const col = (i % cols) + 1; // Od lewej do prawej
-        
-        layout.push({
-          index,
-          gridColumnStart: col,
-          gridRow: row
-        });
-      });
+      // Teraz porównujemy wartość porządkową z liczbą nieaktywnych segmentów
+      // Im większa wartość orderValue, tym później segment powinien wygasnąć
+      const inactiveSegments = totalSegments - activeSegments;
       
-      return layout;
-    }, [segments, cols, totalSegments]);
-    
-    // Funkcja do określania, czy segment jest aktywny - odliczanie od lewej do prawej
-    const isSegmentActive = (index: number, position: { gridColumnStart: number, gridRow: number }) => {
-      const firstRowElements = totalSegments % cols || cols;
-      const firstRowOffset = cols - firstRowElements; // Offset dla wyrównania do prawej
-      
-      // Obliczamy numer porządkowy segmentu, idąc od lewej do prawej, od góry do dołu
-      let orderNumber;
-      if (position.gridRow === 1) {
-        // Dla pierwszego wiersza
-        orderNumber = position.gridColumnStart - firstRowOffset - 1;
-      } else {
-        // Dla pozostałych wierszy
-        orderNumber = firstRowElements + (position.gridRow - 2) * cols + position.gridColumnStart - 1;
-      }
-      
-      // Aktywne są segmenty o numerach porządkowych mniejszych od activeSegments
-      return orderNumber < activeSegments;
+      return orderValue >= inactiveSegments;
     };
     
     return (
       <div style={getContainerStyle()} className="mb-4">
-        {gridLayout.map(({ index, gridColumnStart, gridRow }) => (
+        {gridPositions.map((position) => (
           <div
-            key={index}
+            key={position.globalIndex}
             style={{
-              backgroundColor: isSegmentActive(index, { gridColumnStart, gridRow }) ? currentColor : inactiveColor,
-              gridColumnStart,
-              gridRow,
+              backgroundColor: isSegmentActive(position) ? currentColor : inactiveColor,
+              gridColumnStart: position.col + 1, // +1 bo grid zaczyna się od 1
+              gridRow: position.row + 1, // +1 bo grid zaczyna się od 1
               transition: 'background-color 0.3s ease'
             }}
             className={showDividers ? 'border border-black' : ''}
